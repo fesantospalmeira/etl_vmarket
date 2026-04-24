@@ -1,6 +1,8 @@
 import logging
 from modules.getPedido import getDetalhesPedido, getRelatorioPedido
+from modules.getToken import getToken
 from modules.createConnectionString import create_connection
+from modules.SendLogEmail import send_log_email
 from urllib.parse import quote_plus
 from dotenv import load_dotenv
 from sqlalchemy import text
@@ -22,9 +24,11 @@ logging.basicConfig(
 def main():
     DB_SERVER = os.getenv("DB_SERVER")
     DB_DATABASE = os.getenv("DB_DATABASE")
-    DB_USER = os.getenv("DB_USER")
-    DB_PASS = os.getenv("DB_PASS")
+    EMAIL = os.getenv('EMAIL')
+    PASS = os.getenv('PASSWORD')
     DRIVER = os.getenv("DRIVER")
+    
+    baseurl = 'https://integracao-compras.vmarketcompras.com.br/api/'
     odbc_params = quote_plus(
                 f"DRIVER={{{DRIVER}}};"
                 f"SERVER={DB_SERVER};"
@@ -39,12 +43,47 @@ def main():
         FROM vm_tb_pedidos 
         WHERE DT_INCLUSAO >= DATEADD(DAY, -60, SYSDATETIME())
         """
+    query_divergentes = r"""
+        SELECT DISTINCT id_pedido from vm_tb_divergencias
+    """
+    
     try:
         with engine.connect() as connection:
-            df = pd.read_sql(text(query_pedidos), connection)
-        print(df.head(5))
+            df_pedidos = pd.read_sql(text(query_pedidos), connection)
+            df_pedidos_divergentes = pd.read_sql(text(query_divergentes), connection)
+        
+        lista_pedidos = df_pedidos['id_pedido'].to_list()
+        lista_pedidos_divergentes = df_pedidos_divergentes['id_pedido'].to_list()
+        
+        token_1 = getToken(baseurl,EMAIL,PASS)
+        getDetalhesPedido(baseurl,token_1,lista_pedidos,EMAIL,PASS) 
+        token_2 = getToken(baseurl,EMAIL,PASS)
+        getRelatorioPedido(baseurl,token_2,lista_pedidos_divergentes)
+        
+        msg = f"✅ Pedidos atualizados com sucesso!"
+        print(msg)
+        logging.info(msg)
+        
     except Exception as e:
-        print(f"Erro: {e}")
+        msg = f"❌ Erro ao tentar atualizar pedidos: {e}"
+        
+        print(msg)
+        logging.error(msg)
+    
+    EMAIL_USER = os.getenv("EMAIL_USER")
+    EMAIL_PASSWORD = os.getenv("EMAIL_PASSWORD")
+    TO_EMAIL = os.getenv("TO_EMAIL")
+
+    if EMAIL_USER and EMAIL_PASSWORD and TO_EMAIL:
+        send_log_email(
+            smtp_server="smtp.gmail.com",
+            smtp_port=465,
+            email_user=EMAIL_USER,
+            email_password=EMAIL_PASSWORD,
+            log_file=log_path
+        )
+    else:
+        logging.warning("⚠️ Variáveis de email não configuradas no .env, log não enviado.")
     
 if __name__ == '__main__':
     main()
