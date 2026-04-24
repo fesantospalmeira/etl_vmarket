@@ -22,20 +22,25 @@ def getToken(
             token_final = {
                 "Authorization": f'Bearer {token['token']}'
             }
-            print("✅ Token gerado com sucesso!")
-            logging.info("✅ Token gerado com sucesso!")
+            msg = "✅ Token gerado com sucesso!"
+            
+            print(msg)
+            logging.info(msg)
             
             return token_final
         except r.exceptions.JSONDecodeError:
-            print(f"❌ Resposta (Texto): {response.text}")
-            logging.error(f"❌ Resposta (Texto): {response.text}")
+            msg = f"❌ Erro ao decodificar JSON de Token: {response.text}"
+            print(msg)
+            logging.error(msg)
             return None
 
     except r.exceptions.ConnectionError as errc:
-        print(f"❌ Erro de Conexão: {errc}")
-        logging.error(f"❌ Erro de Conexão: {errc}")
+        msg = f"❌ Erro de Conexão com a API de Geração de Token: {errc}"
+        print(msg)
+        logging.error(msg)
         return None
     except r.exceptions.RequestException as err:
-        print(f"❌ Erro na Requisição: {err}")
-        logging.error(f"❌ Erro na Requisição: {err}")
+        msg = f"❌ Erro na Requisição de Geração de Token: {err}"
+        print(msg)
+        logging.error(msg)
         return None

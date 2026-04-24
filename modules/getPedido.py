@@ -4,7 +4,7 @@ import pandas as pd
 from urllib.parse import urljoin
 import requests as r
 import logging
-from modules.saveData import save
+from modules.saveData import save, save_with_period,save_with_id
 from modules.getToken import getToken
 import json
 from dotenv import load_dotenv
@@ -24,8 +24,7 @@ def getData(
     for filial in lista_filiais:
         page = 1
         
-        while True:
-        # while page == 1:
+        while page <= 5:
                 url = urljoin(baseurl, 'pedido/listar')
                 params = {
                     "paginate": 100,
@@ -38,7 +37,7 @@ def getData(
                 try:
                     response = r.get(url, headers=token, params=params)
                     if response.status_code != 200:
-                        msg = f'❌ Erro ao buscar pedidos. Código: {response.status_code} Response:{response.text[:100]}'
+                        msg = f'❌ Erro ao buscar pedidos. Código: {response.status_code} Response:{response.text[:300]}'
                         print(msg)
                         logging.error(msg)
                         break
@@ -65,7 +64,7 @@ def getData(
                         break
 
                     page += 1
-                    time.sleep(3)
+                    # time.sleep(3)
                 except Exception as e:
                     print(f"❌ Erro ao processar: {e}")
                     logging.error(f"❌ Erro ao processar: {e}")
@@ -74,22 +73,26 @@ def getData(
     if not data_list:
         print("⚠️ Nenhuma pedido encontrado em nenhuma filial.")
         logging.warning("⚠️ Nenhuma pedido encontrado em nenhuma filial.")
+        token_2 = getToken(baseurl,email,password)
+        lista_pedidos_divergentes = getPedidosDivergentes(baseurl,token_2,lista_filiais)
+        time.sleep(10)
+        token_3 = getToken(baseurl,email,password)
+        getRelatorioPedido(baseurl,token_3,lista_pedidos_divergentes)
         return
 
 
     df = pd.DataFrame(data_list).drop_duplicates()
-    save(df, 'vm_tb_pedidos')
-    print(f"💾 {len(df)} pedidos salvos com sucesso!")
-    logging.info(f"💾 {len(df)} pedidos salvos com sucesso!")
+    
+    save_with_id(df, 'vm_tb_pedidos','id_pedido')
+
+    
     print(f"\n🔍 Iniciado detalhamento de pedidos..")
     logging.info(f"\n🔍 Iniciado detalhamento de pedidos..")
 
-    # df['dt_inclusao'] = pd.to_datetime(df['dt_inclusao'])
     lista_pedidos = df['id_pedido'].to_list()
-    print(len(lista_pedidos))
     token_1 = getToken(baseurl,email,password)
     getDetalhesPedido(baseurl,token_1,lista_pedidos,email,password) 
-    time.sleep(10)
+    
     token_2 = getToken(baseurl,email,password)
     lista_pedidos_divergentes = getPedidosDivergentes(baseurl,token_2,lista_filiais)
     time.sleep(10)
@@ -174,9 +177,7 @@ def getDetalhesPedido(
             page += 1
             
     df = pd.DataFrame(data_list)
-    save(df, 'vm_tb_detalhes_pedido')
-    print(f"💾 {len(df)} detalhes de pedidos salvos com sucesso!")
-    logging.info(f"💾 {len(df)} detalhes de pedidos salvos com sucesso!")
+    save_with_id(df, 'vm_tb_detalhes_pedido',id_pedido)
     
 
 def getPedidosDivergentes(
